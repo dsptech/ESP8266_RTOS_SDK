@@ -53,18 +53,22 @@
 #define SET_STKREG(r,v)     sp[(r) >> 2] = (uint32_t)(v)
 #define PORT_ASSERT(x)      do { if (!(x)) {ets_printf("%s %u\n", "rtos_port", __LINE__); while(1){}; }} while (0)
 
+#ifndef ESP_PORTC_32BIT_ATTR
+#define ESP_PORTC_32BIT_ATTR
+#endif
+
 extern uint8_t NMIIrqIsOn;
 
 uint32_t cpu_sr;
 
-uint32_t _xt_tick_divisor;
+uint32_t _xt_tick_divisor ESP_PORTC_32BIT_ATTR;
 
 /* Each task maintains its own interrupt status in the critical nesting
 variable. */
-static uint32_t uxCriticalNesting = 0;
+static uint32_t uxCriticalNesting ESP_PORTC_32BIT_ATTR = 0;
 
-uint32_t g_esp_boot_ccount;
-uint64_t g_esp_os_us;
+uint32_t g_esp_boot_ccount ESP_PORTC_32BIT_ATTR;
+uint64_t g_esp_os_us ESP_PORTC_32BIT_ATTR;
 
 #ifdef ESP_ENABLE_ESP_OS_TICKS
 /* apparently unused for at least a year. remove to free resources and increase performance  */
@@ -72,9 +76,9 @@ uint64_t g_esp_os_ticks;
 #endif
 
 #ifndef CONFIG_FREERTOS_RUN_TIME_STATS_USING_CPU_CLK
-uint64_t g_esp_os_cpu_clk;
+uint64_t g_esp_os_cpu_clk ESP_PORTC_32BIT_ATTR;
 #endif
-static uint32_t s_switch_ctx_flag;
+static uint32_t s_switch_ctx_flag ESP_PORTC_32BIT_ATTR;
 
 void vPortEnterCritical(void);
 void vPortExitCritical(void);
@@ -315,7 +319,7 @@ void show_critical_info(void)
 }
 
 #ifdef ESP_DPORT_CLOSE_NMI
-static int s_nmi_is_closed;
+static int s_nmi_is_closed ESP_PORTC_32BIT_ATTR;
 
 void esp_dport_close_nmi(void)
 {
@@ -382,7 +386,7 @@ bool interrupt_is_disable(void)
     return tmp & 0xFUL ? true : false;
 }
 
-static _xt_isr_entry s_isr[16];
+static _xt_isr_entry s_isr[16] ESP_PORTC_32BIT_ATTR;
 static uint8_t s_xt_isr_status = 0;
 
 void _xt_isr_attach(uint8_t i, _xt_isr func, void* arg)
