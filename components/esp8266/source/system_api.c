@@ -396,36 +396,22 @@ uint32_t esp_get_old_sysconf_addr(void)
     return rtc_sys_info.old_sysconf_addr;
 }
 
-void os_update_cpu_frequency(uint32_t ticks_per_us)
-{
-    /* ets_update_cpu_frequency (alias of os_update_cpu_frequency) is called from esp_set_cpu_freq() just after the
-     * frequency switch. The call occur in a interrupt DISABLED context.
-     * In this function is also assumed that CCOUNT timer has worked with the previous frequency up to this point,
-     * so, the current CCOUNT value can be used to minimize the time error (due the frequency change) by an immediate
-     * evaluation of a new value of ccompare.
-     * This immediate evaluation (new_ccompare) also make sure that esp_timer_get_time() will produce monotonic values only.
-     *
-     * note1: Tests has shown that the time error of esp_timer_get_time() is < 1us for each esp_set_cpu_freq() call.
-     * note2: A further test performed with 36000 frequency changes spanned over one hour, and the time point of
-     *        each esp_set_cpu_freq() call randomly chosen in the current time slice, has reported a cumulative
-     *        time error <100us.
-     * note3: An nmi activity (pwm) may degrade these performances.
-     */
-
+static void __attribute__ ((noinline)) _os_update_cpu_frequency(uint32_t ccount){
+    /* prevent inlining inside the IRAM_ATTR attribute of the caller (save ram) */
     extern void vPortCheckCCompareAndRecover(void); //patched port.c
     extern uint32_t _xt_tick_divisor;             //port.c
-    uint32_t ccount, new_ccompare;
+    uint32_t new_ccompare;
     int32_t left;
     bool new160, old160;
-
-    ccount = soc_get_ccount();  //as soon as possible.
 
     old160 = (g_esp_ticks_per_us == CPU_CLK_FREQ * 2 / 1000000);
     new160 = !!(REG_READ(DPORT_CTL_REG) & DPORT_CTL_DOUBLE_CLK);
 
     if (old160 != new160) {
         // a change of frequency has been occurred.
+        //ccount=ccount-10;                               //compensate
         left = (int32_t) (soc_get_ccompare() - ccount);   //negative if too late
+
 
         if (new160) {
             /* 80MHz -> 160MHz */
@@ -447,6 +433,28 @@ void os_update_cpu_frequency(uint32_t ticks_per_us)
 
         vPortCheckCCompareAndRecover();
     }
+}
+
+void IRAM_ATTR os_update_cpu_frequency(uint32_t ticks_per_us)
+{
+    /* ets_update_cpu_frequency (alias of os_update_cpu_frequency) is called from esp_set_cpu_freq() just after the
+     * frequency switch. The call occur in a interrupt DISABLED context.
+     * In this function is also assumed that CCOUNT timer has worked with the previous frequency up to this point,
+     * so, the current CCOUNT value can be used to minimize the time error (due the frequency change) by an immediate
+     * evaluation of a new value of ccompare.
+     * This immediate evaluation (new_ccompare) also make sure that esp_timer_get_time() will produce monotonic values only.
+     *
+     * note1: Tests have shown that the time error of esp_timer_get_time() is < 1us for each esp_set_cpu_freq() call.
+     * note2: A further test performed with 36000 frequency changes spanned over one hour, and the time point of
+     *        each esp_set_cpu_freq() call randomly chosen in the current time slice, has reported a cumulative
+     *        time error <100us.
+     * note3: An nmi activity (pwm) may degrade these performances.
+     * note4: IRAM_ATTR to reduce timing error due cache miss
+     */
+    uint32_t ccount;
+    (void) ticks_per_us;
+    ccount = soc_get_ccount();          //as soon as possible.
+    _os_update_cpu_frequency(ccount);   //pass to a non-IRAM function
 }
 
 void ets_update_cpu_frequency(uint32_t ticks_per_us) __attribute__((alias("os_update_cpu_frequency")));
