@@ -253,3 +253,13 @@ esp_err_t hw_timer_init(hw_timer_callback_t callback, void *arg)
 
     return ESP_OK;
 }
+
+uint32_t IRAM_ATTR timer_get_intr_status (void)
+{
+    return frc1.ctrl.intr_status;
+}
+
+void IRAM_ATTR timer_clr_intr_status (void)
+{
+    frc1.intr.val = 0;
+}
